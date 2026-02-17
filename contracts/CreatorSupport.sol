@@ -4,10 +4,6 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-/**
- * @title CreatorSupport
- * @dev Sound Boost funding mechanism for creators
- */
 contract CreatorSupport is Ownable {
     IERC20 public soundToken;
 
@@ -40,22 +36,15 @@ contract CreatorSupport is Ownable {
         soundToken = IERC20(_soundToken);
     }
 
-    /**
-     * @dev Register a creator for Sound Boost funding
-     */
     function registerCreator(uint256 royaltyRate) external {
         require(royaltyRate > 0 && royaltyRate <= 100, "Invalid royalty rate");
         creators[msg.sender] = Creator(msg.sender, 0, royaltyRate, true);
         emit CreatorRegistered(msg.sender, royaltyRate);
     }
 
-    /**
-     * @dev Create a new funding round for a creator
-     */
     function createFundingRound(uint256 fundingGoal, uint256 durationDays) external {
         require(creators[msg.sender].active, "Creator not registered");
         require(fundingGoal > 0, "Funding goal must be positive");
-
         uint256 roundId = roundCounter++;
         fundingRounds[roundId] = FundingRound(
             roundId,
@@ -65,54 +54,36 @@ contract CreatorSupport is Ownable {
             block.timestamp + (durationDays * 1 days),
             false
         );
-
         emit FundingRoundCreated(roundId, msg.sender, fundingGoal);
     }
 
-    /**
-     * @dev Contribute to a creator funding round
-     */
     function contributeFunding(uint256 roundId, uint256 amount) external {
         FundingRound storage round = fundingRounds[roundId];
         require(!round.completed, "Funding round already completed");
         require(block.timestamp <= round.deadline, "Funding round expired");
         require(amount > 0, "Contribution must be positive");
-
         soundToken.transferFrom(msg.sender, address(this), amount);
         round.amountRaised += amount;
-
         if (round.amountRaised >= round.fundingGoal) {
             round.completed = true;
             emit FundingCompleted(roundId, round.creator, round.amountRaised);
         }
-
         emit FundingContribution(roundId, msg.sender, amount);
     }
 
-    /**
-     * @dev Withdraw funds from a completed funding round
-     */
     function withdrawFunds(uint256 roundId) external {
         FundingRound storage round = fundingRounds[roundId];
         require(round.completed, "Funding round not completed");
         require(msg.sender == round.creator, "Only creator can withdraw");
-
         uint256 amount = round.amountRaised;
         round.amountRaised = 0;
-
         soundToken.transfer(msg.sender, amount);
     }
 
-    /**
-     * @dev Get creator details
-     */
     function getCreator(address creatorAddr) external view returns (Creator memory) {
         return creators[creatorAddr];
     }
 
-    /**
-     * @dev Get funding round details
-     */
     function getFundingRound(uint256 roundId) external view returns (FundingRound memory) {
         return fundingRounds[roundId];
     }
